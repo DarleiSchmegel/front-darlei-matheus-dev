@@ -1,11 +1,11 @@
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function Home() {
+export default function Portfolio() {
   const { handleWhichNavItemIsOpen } = useTheme();
-  handleWhichNavItemIsOpen('');
+  handleWhichNavItemIsOpen('portfolio');
   return (
     <section>
-      <h1>Home</h1>
+      <h1>Portifólio</h1>
     </section>
   );
 }

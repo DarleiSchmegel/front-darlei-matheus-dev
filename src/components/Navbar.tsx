@@ -9,7 +9,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="relative flex flex-wrap items-center justify-between bg-gray-900 border-b-[1px] border-green-300 px-2 py-3 mb-3">
+      <nav className="relative flex flex-wrap items-center justify-between bg-gray-900 border-b-[1px] border-green-300 px-2 py-3 ">
         <div className="container px-4 mx-auto flex flex-wrap items-center justify-between">
           <div className="w-full relative flex justify-between lg:w-auto lg:static lg:block lg:justify-start">
             <Link href="/">
@@ -82,7 +82,7 @@ export default function Navbar() {
                 <MenuItem href="/about" title="Sobre" isActive={whichNavItemIsOpen === 'about'} />
               </li>
               <li className="flex justify-center items-center p-2">
-                <button onClick={ToggleTheme}>
+                <button onClick={ToggleTheme} className="text-gray-100">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-6 w-6"

@@ -4,7 +4,7 @@ export default function Home() {
   const { handleWhichNavItemIsOpen } = useTheme();
   handleWhichNavItemIsOpen('');
   return (
-    <section>
+    <section className="">
       <h1>Home</h1>
     </section>
   );

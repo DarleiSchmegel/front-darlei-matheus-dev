@@ -1,12 +1,14 @@
-import { useTheme } from '../contexts/ThemeContext';
+import Footer from './Footer';
+import Navbar from './Navbar';
 
 export default function Layout({ children }) {
-  const { theme } = useTheme();
   return (
-    <main className={theme}>
-      <div className="min-h-screen dark:bg-gray-700 dark:text-gray-100 flex flex-col justify-between transition-colors ">
+    <div className="flex flex-col min-h-screen">
+      <Navbar />
+      <main className="my-auto self-center max-w-[1200px] flex flex-col items-center">
         {children}
-      </div>
-    </main>
+      </main>
+      <Footer />
+    </div>
   );
 }

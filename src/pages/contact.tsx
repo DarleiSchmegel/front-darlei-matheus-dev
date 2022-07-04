@@ -1,7 +1,7 @@
-import { useTheme } from '../contexts/ThemeContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export default function Contact() {
-  const { handleWhichNavItemIsOpen } = useTheme();
+  const { handleWhichNavItemIsOpen } = useNavigation();
   handleWhichNavItemIsOpen('contact');
   return (
     <section>

@@ -1,7 +1,7 @@
-import { useTheme } from '../contexts/ThemeContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export default function Portfolio() {
-  const { handleWhichNavItemIsOpen } = useTheme();
+  const { handleWhichNavItemIsOpen } = useNavigation();
   handleWhichNavItemIsOpen('portfolio');
   return (
     <section>

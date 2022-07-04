@@ -1,10 +1,10 @@
-import { useTheme } from '../contexts/ThemeContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export default function Home() {
-  const { handleWhichNavItemIsOpen } = useTheme();
+  const { handleWhichNavItemIsOpen } = useNavigation();
   handleWhichNavItemIsOpen('');
   return (
-    <section>
+    <section className="">
       <h1>Home</h1>
     </section>
   );

@@ -12,7 +12,7 @@ export default function MenuItem({ href, title, isActive }: MenuItemProps) {
     <Link href={href}>
       <a
         className={classNames(
-          'flex items-center px-3 my-3 border-b-2 font-bold text-lg hover:text-green-300 hover:border-green-300 transition-colors',
+          'flex items-center px-3 my-3 border-b-2 font-bold text-lg text-gray-100 hover:text-green-300 hover:border-green-300 transition-colors',
           {
             'border-transparent': !isActive,
             'text-green-300 border-green-300': isActive,

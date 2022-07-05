@@ -1,6 +1,6 @@
 import type { AppProps } from 'next/app';
 import { ApolloProvider } from '@apollo/client';
-import Layout from '../components/Layout';
+import Layout from '../components/atomicDesign/organisms/Layout';
 
 import { NavigationProvider } from '../contexts/NavigationContext';
 import { ThemeProvider } from 'next-themes';

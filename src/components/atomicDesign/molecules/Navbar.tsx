@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import MenuItem from '../Atoms/MenuItem';
-import { useNavigation } from '../contexts/NavigationContext';
+import MenuItem from '../atoms/MenuItem';
+import { useNavigation } from '../../../contexts/NavigationContext';
 
 export default function Navbar() {
   const [navbarOpen, setNavbarOpen] = useState(false);

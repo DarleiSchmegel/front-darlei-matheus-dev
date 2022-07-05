@@ -5,5 +5,19 @@ query GetAllPosts {
     tags
     title
     date
+    excerpt
+    stage
+    author {
+      name
+      id
+      title
+      biography
+      picture {
+        url
+      }
+    }
+    coverImage {
+      url
+    }
   }
 }

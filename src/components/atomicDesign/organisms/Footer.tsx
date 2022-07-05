@@ -1,5 +1,5 @@
-import CustomLink from '../Atoms/CustomLink';
-import SocialMedia from '../Atoms/SocialMedia';
+import CustomLink from '../atoms/CustomLink';
+import SocialMedia from '../atoms/SocialMedia';
 
 export default function Footer() {
   return (

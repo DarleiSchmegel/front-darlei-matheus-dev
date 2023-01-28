@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import MenuItem from '../Atoms/MenuItem';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -8,9 +8,31 @@ export default function Navbar() {
   const [navbarOpen, setNavbarOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { whichNavItemIsOpen } = useNavigation();
+
+  //Hide and show Navbar
+  const [prevScrollPos, setPrevScrollPos] = useState(75);
+  const [visible, setVisible] = useState(true);
+
+  const handleScroll = () => {
+    const currentScrollPos = window.scrollY;
+
+    if (currentScrollPos > prevScrollPos) {
+      setVisible(false);
+    } else {
+      setVisible(true);
+    }
+
+    setPrevScrollPos(currentScrollPos);
+  };
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  });
   return (
     <>
-      <nav className="relative flex flex-wrap items-center justify-between bg-gray-900 border-b-[1px] border-green-300 px-2 py-3 ">
+      <nav className={`z-50 w-full bg-gray-900 border-b-[1px] border-green-300 px-2 py-3 fixed transition-1 duration-700 ease-in-out ${visible ? 'top-0' : 'lg:top-[-100px]'}`}>
         <div className="container px-4 mx-auto flex flex-wrap items-center justify-between">
           <div className="w-full relative flex justify-between lg:w-auto lg:static lg:block lg:justify-start">
             <Link href="/">

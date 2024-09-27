@@ -1,0 +1,9 @@
+query GetAllPosts {
+  posts(orderBy: date_DESC, stage: PUBLISHED) {
+    id
+    slug
+    tags
+    title
+    date
+  }
+}

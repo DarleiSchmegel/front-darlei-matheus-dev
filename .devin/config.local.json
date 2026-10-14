@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "export CLAUDE_PROJECT_DIR=\"${DEVIN_PROJECT_DIR}\"; [ ! -f \"${DEVIN_PROJECT_DIR}/.devin/skills/impeccable/scripts/impeccable\" ] || \"${DEVIN_PROJECT_DIR}/.devin/skills/impeccable/scripts/impeccable\" hook",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(edit|write|apply_patch|notebook_edit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "export CLAUDE_PROJECT_DIR=\"${DEVIN_PROJECT_DIR}\"; [ ! -f \"${DEVIN_PROJECT_DIR}/.devin/skills/impeccable/scripts/impeccable\" ] || \"${DEVIN_PROJECT_DIR}/.devin/skills/impeccable/scripts/impeccable\" hook",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "export CLAUDE_PROJECT_DIR=\"${DEVIN_PROJECT_DIR}\"; [ ! -f \"${DEVIN_PROJECT_DIR}/.devin/skills/impeccable/scripts/impeccable\" ] || \"${DEVIN_PROJECT_DIR}/.devin/skills/impeccable/scripts/impeccable\" hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

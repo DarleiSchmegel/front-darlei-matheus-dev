@@ -1,54 +1,27 @@
-import Link from 'next/link';
-import { ReactNode, ButtonHTMLAttributes } from 'react';
+import { ButtonHTMLAttributes, ReactNode } from 'react';
+import classNames from 'classnames';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant: 'default' | 'primary' | 'secundary';
+  variant: 'primary' | 'default' | 'secundary';
   children: ReactNode;
 }
 
-export default function Button({ children, variant, ...props }: ButtonProps) {
-  switch (variant) {
-    case 'primary':
-      return (
-        <button
-          {...props}
-          className="rounded-md  bg-blue-600 px-9 py-2.5 text-lg font-medium text-gray-100"
-        >
-          {children}
-        </button>
-      );
-    case 'secundary':
-      return (
-        <button
-          {...props}
-          className="
-            rounded-md
-            border-2 
-            border-green-300
-            px-9 
-            py-2.5 
-            text-lg 
-            font-medium
-            text-green-300 
-             
-            hover:text-gray-100 
-            hover:bg-green-300
-            dark:border-gray-100
-            dark:text-gray-100"
-        >
-          {children}
-        </button>
-      );
+export default function Button({ children, variant, className, ...props }: ButtonProps) {
+  const base =
+    'inline-flex items-center gap-2 rounded-sm px-6 py-2.5 text-sm font-medium transition-colors duration-200';
 
+  const variants = {
+    primary:
+      'bg-accent-light text-white hover:bg-accent-light/90 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90',
+    secundary:
+      'border border-edge-light text-ink-primary hover:border-accent-light hover:text-accent-light dark:border-edge-dark dark:text-ink-light dark:hover:border-accent dark:hover:text-accent',
     default:
-      return (
-        <button
-          {...props}
-          className="rounded-md border-2 
-          border-gray-700 dark:bg-green-300 px-9 py-2.5 text-lg font-medium text-gray-700 "
-        >
-          {children}
-        </button>
-      );
-  }
+      'border border-edge-light text-ink-muted hover:text-ink-primary hover:border-ink-muted dark:border-edge-dark dark:text-ink-muted-dark dark:hover:text-ink-light dark:hover:border-ink-muted-dark',
+  };
+
+  return (
+    <button {...props} className={classNames(base, variants[variant], className)}>
+      {children}
+    </button>
+  );
 }

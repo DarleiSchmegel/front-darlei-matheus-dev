@@ -1,59 +1,97 @@
-import Button from '../Atoms/Button';
-import CustomLink from '../Atoms/CustomLink';
+import Image from 'next/image';
+import { ArrowUpRight } from 'phosphor-react';
+import Link from 'next/link';
 import SocialMedia from '../Atoms/SocialMedia';
+import { intro, profile } from '../data/site';
+
+const credentials = ['Sienge · Starian', 'Nelogica', 'App Masters', 'UFPel'];
 
 export default function Hero() {
   return (
-    <section className="min-h-screen max-w-[1200px] flex">
-      <div className="grid max-w-screen-xl mt-20 px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12">
-        <div className="mr-auto place-self-center lg:col-span-7">
-          <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl dark:text-white">
-            Darlei Matheus <br /> Schmegel
+    <section className="w-full border-b border-edge-light dark:border-edge-dark">
+      <div className="mx-auto flex max-w-6xl flex-col gap-12 px-6 pb-16 pt-32 md:pt-40 lg:flex-row lg:items-center lg:gap-20 lg:pb-24">
+        <div className="flex-1">
+          <h1 className="font-display text-4xl font-bold leading-[1.08] tracking-tight text-ink-primary dark:text-ink-light sm:text-5xl lg:text-6xl">
+            {intro.headline}
           </h1>
-          <p className="max-w-2xl mb-6 font-light text-gray-500 lg:mb-8 md:text-lg lg:text-xl dark:text-gray-400">
-            Olá. Me chamo Darlei e sou Engenheiro de Computação formado pela UFPel.
+          <p className="mt-4 font-mono text-sm text-accent-light dark:text-accent">
+            {profile.role}
           </p>
-          <p className="max-w-2xl mb-6 font-light text-gray-500 lg:mb-8 md:text-lg lg:text-xl dark:text-gray-400">
-            Também sou Desenvolvedor Full Stack, trabalhando com tecnologias como TypeScript,
-            NestJs, NodeJs, Javascript, ReactJ, NextJs e TailwindCSS, com elas eu desenvolvo
-            sistemas e sites incriveis.
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-muted dark:text-ink-muted-dark">
+            {intro.body}
           </p>
-          {/* <a
-            href="#"
-            className="inline-flex items-center justify-center px-5 py-3 mr-3 text-base font-medium text-center text-white rounded-lg bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900"
-          >
-            Get started
-            <svg
-              className="w-5 h-5 ml-2 -mr-1"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              ></path>
-            </svg>
-          </a>
-          <a
-            href="#"
-            className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-100 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:ring-gray-800"
-          >
-            Speak to Sales
-          </a> */}
-          <div className='flex flex-wrap gap-3'>
-            <Button variant="primary">Portifólio</Button>
 
-            <Button variant="default">Contato</Button>
+          <div className="mt-10 flex flex-wrap items-center gap-4">
+            <Link href="/portfolio">
+              <a className="inline-flex items-center gap-2 rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90">
+                Explorar projetos
+                <ArrowUpRight size={16} weight="bold" />
+              </a>
+            </Link>
+            <Link href="/about">
+              <a className="inline-flex items-center gap-2 rounded-sm border border-edge-light px-6 py-3 text-sm font-medium text-ink-primary transition-colors duration-200 hover:border-ink-muted dark:border-edge-dark dark:text-ink-light dark:hover:border-ink-muted-dark">
+                Sobre mim
+              </a>
+            </Link>
+          </div>
+
+          <div className="mt-10 flex items-center gap-5">
+            <SocialMedia href={profile.github} icon="Github" size={22} />
+            <SocialMedia href={profile.linkedin} icon="Linkedin" size={22} />
+            <SocialMedia href={profile.instagram} icon="Instagram" size={22} />
+            <SocialMedia href={`mailto:${profile.email}`} icon="Email" size={22} />
           </div>
         </div>
 
-        <div className="hidden lg:mt-0 lg:col-span-5 lg:flex lg:items-center lg:justify-center">
-          <img
-            src="https://flowbite.s3.amazonaws.com/blocks/marketing-ui/hero/phone-mockup.png"
-            alt="mockup"
-          />
+        <div className="shrink-0">
+          <figure className="w-56 sm:w-64 lg:w-72">
+            <div className="relative">
+              <div className="absolute -right-2 -top-2 h-6 w-6 border-r border-t border-accent-light dark:border-accent" />
+              <div className="absolute -bottom-2 -left-2 h-6 w-6 border-b border-l border-accent-light dark:border-accent" />
+              <div className="overflow-hidden border border-edge-light dark:border-edge-dark">
+                <div className="dark:hidden">
+                  <Image
+                    src="/assets/darlei-light.png"
+                    alt="Retrato de Darlei M. Schmegel em escritório"
+                    width={543}
+                    height={724}
+                    layout="responsive"
+                    priority
+                  />
+                </div>
+                <div className="hidden dark:block">
+                  <Image
+                    src="/assets/darlei-dark.png"
+                    alt="Retrato de Darlei M. Schmegel em escritório"
+                    width={543}
+                    height={724}
+                    layout="responsive"
+                    priority
+                  />
+                </div>
+              </div>
+            </div>
+            <figcaption className="mt-4 flex items-center justify-between font-mono text-xs text-ink-muted dark:text-ink-muted-dark">
+              <span>{profile.name}</span>
+              <span>{profile.location}</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <div className="border-t border-edge-light dark:border-edge-dark">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-6 py-4">
+          <span className="font-mono text-xs uppercase tracking-wider text-ink-muted dark:text-ink-muted-dark">
+            Experiência em
+          </span>
+          {credentials.map((org) => (
+            <span
+              key={org}
+              className="text-sm font-medium text-ink-primary/80 dark:text-ink-light/80"
+            >
+              {org}
+            </span>
+          ))}
         </div>
       </div>
     </section>

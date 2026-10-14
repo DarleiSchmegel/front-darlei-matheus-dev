@@ -6,13 +6,35 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
-      backgroundImage: {
-        blur: 'url(/public/assets/blur-background.png)',
-      },
       fontFamily: {
-        sans: 'Roboto, sans-serif',
+        display: ['"Space Grotesk"', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
+        ground: {
+          light: '#F8F8F6',
+          dark: '#111215',
+        },
+        surface: {
+          light: '#FFFFFF',
+          dark: '#181A1F',
+          raise: '#1E2127',
+        },
+        edge: {
+          light: '#E2E4E9',
+          dark: '#2A2E37',
+        },
+        ink: {
+          primary: '#111215',
+          light: '#F4F2ED',
+          muted: '#5A6270',
+          'muted-dark': '#8E95A2',
+        },
+        accent: {
+          DEFAULT: '#A3E635',
+          light: '#65A30D',
+        },
         green: {
           300: '#00B37E',
           500: '#00875F',

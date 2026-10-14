@@ -1,13 +1,12 @@
-import Link from 'next/link';
 import {
+  DribbbleLogo,
+  EnvelopeSimple,
   FacebookLogo,
+  GithubLogo,
   InstagramLogo,
   LinkedinLogo,
-  GithubLogo,
   TwitterLogo,
   WhatsappLogo,
-  PinterestLogo,
-  DribbbleLogo,
 } from 'phosphor-react';
 
 interface SocialMediaProps {
@@ -21,29 +20,27 @@ interface SocialMediaProps {
     | 'Twitter'
     | 'Whatsapp'
     | 'Pinterest'
-    | 'Dribbble';
+    | 'Dribbble'
+    | 'Email';
 }
 
 export default function SocialMedia({ href, icon, size }: SocialMediaProps) {
+  const isExternal = href.startsWith('http');
   return (
-    <Link
+    <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title="teste"
+      {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       aria-label={`Acessar ${icon}`}
+      className="text-ink-muted transition-colors duration-200 hover:text-accent-light dark:text-ink-muted-dark dark:hover:text-accent"
     >
-      <a className="text-white hover:text-green-300 transition-colors">
-        <span className="sr-only">{icon}</span>
-        {icon === 'Instagram' && <InstagramLogo size={size} />}
-        {icon === 'Facebook' && <FacebookLogo size={size} />}
-        {icon === 'Github' && <GithubLogo size={size} />}
-        {icon === 'Linkedin' && <LinkedinLogo size={size} />}
-        {icon === 'Pinterest' && <PinterestLogo size={size} />}
-        {icon === 'Whatsapp' && <WhatsappLogo size={size} />}
-        {icon === 'Twitter' && <TwitterLogo size={size} />}
-        {icon === 'Dribbble' && <DribbbleLogo size={size} />}
-      </a>
-    </Link>
+      {icon === 'Instagram' && <InstagramLogo size={size} />}
+      {icon === 'Facebook' && <FacebookLogo size={size} />}
+      {icon === 'Github' && <GithubLogo size={size} />}
+      {icon === 'Linkedin' && <LinkedinLogo size={size} />}
+      {icon === 'Whatsapp' && <WhatsappLogo size={size} />}
+      {icon === 'Twitter' && <TwitterLogo size={size} />}
+      {icon === 'Dribbble' && <DribbbleLogo size={size} />}
+      {icon === 'Email' && <EnvelopeSimple size={size} />}
+    </a>
   );
 }

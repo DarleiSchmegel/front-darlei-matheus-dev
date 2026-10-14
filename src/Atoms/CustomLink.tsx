@@ -12,10 +12,14 @@ export default function CustomLink({ href, type, children }: CustomLinkProps) {
   return (
     <Link href={href}>
       <a
-        className={classNames('text-lg hover:border-b-2 transition-colors', {
-          'text-gray-50 hover:text-green-300 hover:border-green-300': type === 'primary',
-          'text-green-300  hover:border-green-300': type === 'secondary',
-        })}
+        className={classNames(
+          'text-sm underline-offset-4 transition-colors duration-200 hover:text-accent-light dark:hover:text-accent hover:underline',
+          {
+            'text-ink-muted dark:text-ink-muted-dark': type === 'primary',
+            'text-accent-light dark:text-accent': type === 'secondary',
+            'text-ink-primary dark:text-ink-light': type === 'tertiary',
+          },
+        )}
       >
         {children}
       </a>

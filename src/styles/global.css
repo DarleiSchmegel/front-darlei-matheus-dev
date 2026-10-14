@@ -3,6 +3,43 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-100 text-gray-700 dark:text-gray-100 dark:bg-gray-700 transition;
+  @apply bg-ground-light text-ink-primary dark:bg-ground-dark dark:text-ink-light transition-colors duration-300;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  @apply bg-accent-light text-white;
+}
+
+.dark ::selection {
+  @apply bg-accent text-ground-dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-ground-light dark:bg-ground-dark;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-edge-light dark:bg-edge-dark rounded-full border-2 border-solid border-ground-light dark:border-ground-dark;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-ink-muted dark:bg-ink-muted-dark;
+}
+
+:focus-visible {
+  @apply outline-none ring-2 ring-accent-light dark:ring-accent ring-offset-2 ring-offset-ground-light dark:ring-offset-ground-dark;
+}
+
+input,
+textarea {
+  caret-color: #a3e635;
 }

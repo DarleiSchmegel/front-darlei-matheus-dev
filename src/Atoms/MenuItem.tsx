@@ -12,14 +12,20 @@ export default function MenuItem({ href, title, isActive }: MenuItemProps) {
     <Link href={href}>
       <a
         className={classNames(
-          'flex items-center px-3 my-3 border-b-2 font-bold text-lg text-gray-100 hover:text-green-300 hover:border-green-300 transition-colors',
-          {
-            'border-transparent': !isActive,
-            'text-green-300 border-green-300': isActive,
-          },
+          'relative px-1 py-2 text-sm font-medium transition-colors duration-200',
+          'hover:text-accent-light dark:hover:text-accent',
+          isActive
+            ? 'text-accent-light dark:text-accent'
+            : 'text-ink-muted dark:text-ink-muted-dark',
         )}
       >
         {title}
+        <span
+          className={classNames(
+            'absolute left-0 -bottom-px h-px w-full bg-accent-light dark:bg-accent transition-transform duration-300 origin-left',
+            isActive ? 'scale-x-100' : 'scale-x-0',
+          )}
+        />
       </a>
     </Link>
   );

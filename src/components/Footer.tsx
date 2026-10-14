@@ -17,7 +17,7 @@ export default function Footer() {
             {navItems.map((item) => (
               <li key={item.href}>
                 <Link href={item.href}>
-                  <a className="text-sm text-ink-muted transition-colors hover:text-accent-light dark:text-ink-muted-dark dark:hover:text-accent">
+                  <a className="-my-2 inline-block py-2 text-sm text-ink-muted transition-colors hover:text-accent-light active:text-accent-light dark:text-ink-muted-dark dark:hover:text-accent dark:active:text-accent">
                     {item.label}
                   </a>
                 </Link>
@@ -33,7 +33,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-edge-light dark:border-edge-dark">
-        <p className="mx-auto max-w-6xl px-6 py-4 font-mono text-xs text-ink-muted dark:text-ink-muted-dark">
+        <p className="mx-auto max-w-6xl px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] font-mono text-xs text-ink-muted dark:text-ink-muted-dark">
           © {new Date().getFullYear()} {profile.fullName} · {profile.location}
         </p>
       </div>

@@ -18,7 +18,7 @@ export default function Contact() {
         description="Fale com Darlei M. Schmegel — oportunidades de engenharia de software, projetos SaaS e parcerias técnicas."
         path="/contact"
       />
-      <div className="mx-auto max-w-6xl px-6 pb-20 pt-32 md:pt-40 lg:pb-28">
+      <div className="mx-auto max-w-6xl px-6 pb-20 pt-12 md:pt-20 lg:pb-28 lg:pt-12">
         <ContactSection />
 
         <div className="mt-16 border-t border-edge-light pt-16 dark:border-edge-dark">
@@ -44,7 +44,7 @@ export default function Contact() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-2 block w-full rounded-sm border border-edge-light bg-transparent px-3 py-2.5 text-sm text-ink-primary placeholder:text-ink-muted/60 focus:border-accent-light dark:border-edge-dark dark:text-ink-light dark:placeholder:text-ink-muted-dark/60 dark:focus:border-accent"
+                className="mt-2 block w-full rounded-sm border border-edge-light bg-transparent px-3 py-2.5 text-base text-ink-primary placeholder:text-ink-muted/60 focus:border-accent-light dark:border-edge-dark dark:text-ink-light dark:placeholder:text-ink-muted-dark/60 dark:focus:border-accent"
                 placeholder="Seu nome"
               />
             </div>
@@ -60,13 +60,13 @@ export default function Contact() {
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="mt-2 block w-full rounded-sm border border-edge-light bg-transparent px-3 py-2.5 text-sm text-ink-primary placeholder:text-ink-muted/60 focus:border-accent-light dark:border-edge-dark dark:text-ink-light dark:placeholder:text-ink-muted-dark/60 dark:focus:border-accent"
+                className="mt-2 block w-full rounded-sm border border-edge-light bg-transparent px-3 py-2.5 text-base text-ink-primary placeholder:text-ink-muted/60 focus:border-accent-light dark:border-edge-dark dark:text-ink-light dark:placeholder:text-ink-muted-dark/60 dark:focus:border-accent"
                 placeholder="Sobre o que vamos conversar?"
               />
             </div>
             <button
               type="submit"
-              className="rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90"
+              className="rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 active:bg-accent-light/80 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90 dark:active:bg-accent/80"
             >
               Enviar por e-mail
             </button>

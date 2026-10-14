@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import { ArrowUpRight } from 'phosphor-react';
 import Link from 'next/link';
+import PortraitImage from './PortraitImage';
 import SocialMedia from '../Atoms/SocialMedia';
 import { intro, profile } from '../data/site';
 
@@ -23,13 +23,13 @@ export default function Hero() {
 
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <Link href="/portfolio">
-              <a className="inline-flex items-center gap-2 rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90">
+              <a className="inline-flex items-center gap-2 rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 active:bg-accent-light/80 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90 dark:active:bg-accent/80">
                 Explorar projetos
                 <ArrowUpRight size={16} weight="bold" />
               </a>
             </Link>
             <Link href="/about">
-              <a className="inline-flex items-center gap-2 rounded-sm border border-edge-light px-6 py-3 text-sm font-medium text-ink-primary transition-colors duration-200 hover:border-ink-muted dark:border-edge-dark dark:text-ink-light dark:hover:border-ink-muted-dark">
+              <a className="inline-flex items-center gap-2 rounded-sm border border-edge-light px-6 py-3 text-sm font-medium text-ink-primary transition-colors duration-200 hover:border-ink-muted active:border-ink-muted dark:border-edge-dark dark:text-ink-light dark:hover:border-ink-muted-dark dark:active:border-ink-muted-dark">
                 Sobre mim
               </a>
             </Link>
@@ -49,26 +49,10 @@ export default function Hero() {
               <div className="absolute -right-2 -top-2 h-6 w-6 border-r border-t border-accent-light dark:border-accent" />
               <div className="absolute -bottom-2 -left-2 h-6 w-6 border-b border-l border-accent-light dark:border-accent" />
               <div className="overflow-hidden border border-edge-light dark:border-edge-dark">
-                <div className="dark:hidden">
-                  <Image
-                    src="/assets/darlei-light.png"
-                    alt="Retrato de Darlei M. Schmegel em escritório"
-                    width={543}
-                    height={724}
-                    layout="responsive"
-                    priority
-                  />
-                </div>
-                <div className="hidden dark:block">
-                  <Image
-                    src="/assets/darlei-dark.png"
-                    alt="Retrato de Darlei M. Schmegel em escritório"
-                    width={543}
-                    height={724}
-                    layout="responsive"
-                    priority
-                  />
-                </div>
+                <PortraitImage
+                  sizes="(min-width:1024px) 288px, (min-width:640px) 256px, 224px"
+                  priority
+                />
               </div>
             </div>
             <figcaption className="mt-4 flex items-center justify-between font-mono text-xs text-ink-muted dark:text-ink-muted-dark">

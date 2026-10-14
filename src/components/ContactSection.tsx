@@ -17,7 +17,7 @@ export default function ContactSection() {
             </p>
             <a
               href={`mailto:${profile.email}`}
-              className="mt-8 inline-flex items-center gap-2 rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90"
+              className="mt-8 inline-flex items-center gap-2 rounded-sm bg-accent-light px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent-light/90 active:bg-accent-light/80 dark:bg-accent dark:text-ground-dark dark:hover:bg-accent/90 dark:active:bg-accent/80"
             >
               {profile.email}
               <ArrowUpRight size={16} weight="bold" />
@@ -36,7 +36,7 @@ export default function ContactSection() {
                   href={profile.whatsapp}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ink-primary transition-colors hover:text-accent-light dark:text-ink-light dark:hover:text-accent"
+                  className="-my-3 inline-flex h-11 items-center text-ink-primary transition-colors hover:text-accent-light active:text-accent-light dark:text-ink-light dark:hover:text-accent dark:active:text-accent"
                 >
                   {profile.phone}
                 </a>
@@ -47,7 +47,7 @@ export default function ContactSection() {
                   href={profile.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ink-primary transition-colors hover:text-accent-light dark:text-ink-light dark:hover:text-accent"
+                  className="-my-3 inline-flex h-11 items-center text-ink-primary transition-colors hover:text-accent-light active:text-accent-light dark:text-ink-light dark:hover:text-accent dark:active:text-accent"
                 >
                   @darleischmegel
                 </a>
@@ -58,7 +58,7 @@ export default function ContactSection() {
                   href={profile.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ink-primary transition-colors hover:text-accent-light dark:text-ink-light dark:hover:text-accent"
+                  className="-my-3 inline-flex h-11 items-center text-ink-primary transition-colors hover:text-accent-light active:text-accent-light dark:text-ink-light dark:hover:text-accent dark:active:text-accent"
                 >
                   /darlei-schmegel
                 </a>

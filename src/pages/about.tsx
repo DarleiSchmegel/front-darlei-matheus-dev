@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import { GraduationCap, Trophy } from 'phosphor-react';
+import PortraitImage from '../components/PortraitImage';
 import SEO from '../components/SEO';
 import { profile } from '../data/site';
 
@@ -42,24 +42,7 @@ export default function About() {
 
         <aside className="lg:col-span-4">
           <div className="w-40 overflow-hidden border border-edge-light dark:border-edge-dark lg:w-full">
-            <div className="dark:hidden">
-              <Image
-                src="/assets/darlei-light.png"
-                alt="Retrato de Darlei M. Schmegel em escritório"
-                width={543}
-                height={724}
-                layout="responsive"
-              />
-            </div>
-            <div className="hidden dark:block">
-              <Image
-                src="/assets/darlei-dark.png"
-                alt="Retrato de Darlei M. Schmegel em escritório"
-                width={543}
-                height={724}
-                layout="responsive"
-              />
-            </div>
+            <PortraitImage sizes="(min-width:1024px) 360px, 160px" />
           </div>
 
           <div className="mt-10 border-t border-edge-light dark:border-edge-dark">

@@ -31,7 +31,7 @@ export default function SocialMedia({ href, icon, size }: SocialMediaProps) {
       href={href}
       {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       aria-label={`Acessar ${icon}`}
-      className="text-ink-muted transition-colors duration-200 hover:text-accent-light dark:text-ink-muted-dark dark:hover:text-accent"
+      className="-m-2 inline-flex h-11 w-11 items-center justify-center text-ink-muted transition-colors duration-200 hover:text-accent-light active:text-accent-light dark:text-ink-muted-dark dark:hover:text-accent dark:active:text-accent"
     >
       {icon === 'Instagram' && <InstagramLogo size={size} />}
       {icon === 'Facebook' && <FacebookLogo size={size} />}

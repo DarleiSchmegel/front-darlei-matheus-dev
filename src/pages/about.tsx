@@ -1,7 +1,10 @@
+import { GetStaticProps } from 'next';
 import { GraduationCap, Trophy } from 'phosphor-react';
+import AchievementsSection from '../components/AchievementsSection';
 import PortraitImage from '../components/PortraitImage';
 import SEO from '../components/SEO';
-import { profile } from '../data/site';
+import { Achievement, achievements, profile } from '../data/site';
+import { getBlurDataURL } from '../lib/images';
 
 const paragraphs = [
   'Sou desenvolvedor de software Full Stack, formado em Engenharia de Computação pela Universidade Federal de Pelotas (UFPel), com experiência na construção e evolução de sistemas de software.',
@@ -11,7 +14,17 @@ const paragraphs = [
   'Este espaço reúne um pouco do que construo, das tecnologias que estudo e das ideias que exploro. Mais do que listar ferramentas, quero compartilhar projetos, decisões e aprendizados que representem minha maneira de pensar e construir software.',
 ];
 
-export default function About() {
+interface AboutProps {
+  achievementsWithBlur: Achievement[];
+  portraitBlurDark: string;
+  portraitBlurLight: string;
+}
+
+export default function About({
+  achievementsWithBlur,
+  portraitBlurDark,
+  portraitBlurLight,
+}: AboutProps) {
   return (
     <section className="w-full">
       <SEO
@@ -42,7 +55,11 @@ export default function About() {
 
         <aside className="lg:col-span-4">
           <div className="w-40 overflow-hidden border border-edge-light dark:border-edge-dark lg:w-full">
-            <PortraitImage sizes="(min-width:1024px) 360px, 160px" />
+            <PortraitImage
+              sizes="(min-width:1024px) 360px, 160px"
+              blurDataDark={portraitBlurDark}
+              blurDataLight={portraitBlurLight}
+            />
           </div>
 
           <div className="mt-10 border-t border-edge-light dark:border-edge-dark">
@@ -87,9 +104,37 @@ export default function About() {
                 </ul>
               </div>
             </div>
+
+            <a
+              href="#conquistas"
+              className="mt-2 inline-flex items-center gap-1.5 font-mono text-xs text-accent-light transition-colors hover:underline dark:text-accent"
+            >
+              Ver certificados e premiações ↓
+            </a>
           </div>
         </aside>
       </div>
+      <AchievementsSection achievements={achievementsWithBlur} />
     </section>
   );
 }
+
+export const getStaticProps: GetStaticProps<AboutProps> = async () => {
+  const achievementsWithBlur = await Promise.all(
+    achievements.map(async (achievement) => ({
+      ...achievement,
+      blurDataURL: await getBlurDataURL(achievement.image),
+    })),
+  );
+
+  const portraitBlurDark = await getBlurDataURL('/assets/darlei-dark.png');
+  const portraitBlurLight = await getBlurDataURL('/assets/darlei-light.png');
+
+  return {
+    props: {
+      achievementsWithBlur,
+      portraitBlurDark,
+      portraitBlurLight,
+    },
+  };
+};

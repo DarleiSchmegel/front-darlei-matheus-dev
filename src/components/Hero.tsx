@@ -6,7 +6,12 @@ import { intro, profile } from '../data/site';
 
 const credentials = ['Sienge · Starian', 'Nelogica', 'App Masters', 'UFPel'];
 
-export default function Hero() {
+interface HeroProps {
+  portraitBlurDark?: string;
+  portraitBlurLight?: string;
+}
+
+export default function Hero({ portraitBlurDark, portraitBlurLight }: HeroProps) {
   return (
     <section className="w-full border-b border-edge-light dark:border-edge-dark">
       <div className="mx-auto flex max-w-6xl flex-col gap-12 px-6 pb-16 pt-32 md:pt-40 lg:flex-row lg:items-center lg:gap-20 lg:pb-24">
@@ -52,6 +57,8 @@ export default function Hero() {
                 <PortraitImage
                   sizes="(min-width:1024px) 288px, (min-width:640px) 256px, 224px"
                   priority
+                  blurDataDark={portraitBlurDark}
+                  blurDataLight={portraitBlurLight}
                 />
               </div>
             </div>

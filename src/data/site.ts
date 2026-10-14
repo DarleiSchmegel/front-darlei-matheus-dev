@@ -93,6 +93,65 @@ export const experience: Experience[] = [
   },
 ];
 
+export interface Achievement {
+  id: string;
+  title: string;
+  organization: string;
+  date: string;
+  category: string;
+  highlight: string;
+  description: string;
+  image: string;
+  blurDataURL?: string;
+}
+
+export const achievements: Achievement[] = [
+  {
+    id: 'crea-rs-merito',
+    title: 'Melhor Média Geral do Curso',
+    organization: 'Conselho Regional de Engenharia e Agronomia (CREA-RS)',
+    date: '2022/2',
+    category: 'MÉRITO ACADÊMICO',
+    highlight: 'Mais alto índice de rendimento acadêmico',
+    description:
+      'Distinção conferida pelo Conselho Regional ao formando com o mais alto índice de rendimento acadêmico ao longo de toda a graduação em Engenharia de Computação na UFPel.',
+    image: '/assets/achievements/certificado_MA_CREA.jpg',
+  },
+  {
+    id: 'ufpel-mencao',
+    title: 'Menção Honrosa por Desempenho',
+    organization: 'Universidade Federal de Pelotas (UFPel)',
+    date: '2022/2',
+    category: 'DISTINÇÃO INSTITUCIONAL',
+    highlight: 'Reconhecimento de excelência acadêmica',
+    description:
+      'Homenagem acadêmica concedida pela reitoria e corpo docente em reconhecimento à excelência de desempenho e dedicação durante a graduação.',
+    image: '/assets/achievements/Certifcado_MH_UFPel.jpg',
+  },
+  {
+    id: 'hackathon-ufpel-2022',
+    title: 'Campeão Hackathon UFPel 2022',
+    organization: 'Hackathon UFPel — Projeto "Fila Zero"',
+    date: '2022',
+    category: 'COMPETIÇÃO · 1º LUGAR',
+    highlight: 'Solução vencedora para mobilidade universitária',
+    description:
+      'Desenvolvimento da solução "Fila Zero" para otimização e eliminação de filas nos ônibus de transporte universitário, desenvolvida e validada em equipe em maratona de desenvolvimento.',
+    image: '/assets/achievements/Hackathon_2022.JPG',
+  },
+  {
+    id: 'diploma-ufpel',
+    title: 'Engenheiro de Computação',
+    organization: 'Universidade Federal de Pelotas (UFPel)',
+    date: 'Jul 2023',
+    category: 'GRADUAÇÃO OFICIAL',
+    highlight: 'Formação superior concluída com mérito',
+    description:
+      'Diploma oficial de graduação em Engenharia de Computação emitido pela UFPel, certificando a conclusão do curso com distinção acadêmica.',
+    image: '/assets/achievements/diploma_eng_comp_ufpel.jpeg',
+  },
+];
+
 export interface Project {
   title: string;
   category: string;

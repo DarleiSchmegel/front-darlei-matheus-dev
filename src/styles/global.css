@@ -57,3 +57,18 @@ input,
 textarea {
   caret-color: #a3e635;
 }
+
+@layer utilities {
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+.lightbox-overlay {
+  height: 100vh;
+  height: 100dvh;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}

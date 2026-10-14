@@ -83,14 +83,14 @@ function Lightbox({
 }: LightboxProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ground-dark/90 p-4 backdrop-blur-sm"
+      className="lightbox-overlay fixed inset-0 z-50 flex items-center justify-center bg-ground-dark/90 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={`Visualizar ${achievement.title}`}
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-full w-full max-w-5xl flex-col border border-edge-light bg-surface-light shadow-2xl dark:border-edge-dark dark:bg-surface-dark"
+        className="relative flex h-full max-h-full w-full max-w-5xl flex-col overflow-hidden border border-edge-light bg-surface-light shadow-2xl dark:border-edge-dark dark:bg-surface-dark sm:h-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-edge-light px-4 py-3 dark:border-edge-dark">
@@ -130,7 +130,7 @@ function Lightbox({
           </div>
         </div>
 
-        <div className="relative h-[65vh] bg-ground-light dark:bg-ground-dark">
+        <div className="relative min-h-0 flex-1 bg-ground-light dark:bg-ground-dark sm:h-[65vh] sm:flex-initial">
           <div className="relative h-full w-full">
             <OptimizedImage
               key={achievement.id}
@@ -138,7 +138,7 @@ function Lightbox({
               alt={`Documento completo: ${achievement.title}`}
               layout="fill"
               objectFit="contain"
-              sizes="(max-width: 1280px) 85vw, 1280px"
+              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 85vw, 1280px"
               priority
               blurDataURL={achievement.blurDataURL}
               onLoad={onImageLoad}
@@ -150,7 +150,7 @@ function Lightbox({
           </div>
         </div>
 
-        <div className="flex h-[3.5rem] items-center border-t border-edge-light px-4 dark:border-edge-dark">
+        <div className="flex h-[3.5rem] shrink-0 items-center border-t border-edge-light px-4 dark:border-edge-dark">
           <p className="line-clamp-2 text-xs leading-relaxed text-ink-muted dark:text-ink-muted-dark">
             {achievement.description}
           </p>

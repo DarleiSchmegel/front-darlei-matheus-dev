@@ -1,0 +1,131 @@
+---
+title: "Quanto custa um agente? Créditos, métricas e disciplina de custo"
+description: "Custo de LLM é variável, invisível e cresce com retry. Como reservar antes de executar, liquidar depois e observar o que realmente importa."
+date: "2026-11-28"
+tags: ["agentes", "custo", "observabilidade"]
+---
+
+Custo de LLM tem uma propriedade incômoda: ele é variável por execução e invisível até a fatura. Um agente que responde bem em teste pode custar dez vezes mais em produção por causa de retry, contexto grande ou tool call em loop. Sem controle explícito, o prejuízo aparece depois que o produto já escalou.
+
+Neste projeto, custo não é um relatório. É parte do caminho de execução.
+
+## O ciclo de créditos
+
+Cada tenant tem um ciclo mensal com allowance definido pelo plano, créditos extras e consumo acumulado. O ciclo nasce com status `AVAILABLE` ou `NOT_INCLUDED`, dependendo do plano.
+
+Ciclo sem allowance não derruba a plataforma: bloqueia a capability, com mensagem de upgrade. O produto continua funcionando sem IA; a IA é que fica indisponível.
+
+Toda execução de IA consome créditos. A pergunta de engenharia é *quando* esse consumo é registrado.
+
+## Crédito não é token
+
+Um token de entrada e um token de saída não custam o mesmo, e modelos diferentes têm preços diferentes. Crédito é a unidade de produto que normaliza isso; token é a unidade de execução.
+
+A conversão precisa ser explícita e versionada. Se o preço do modelo muda, a tabela de conversão muda — e o consumo histórico continua legível com a versão da época. Sem essa separação, um reajuste de provider reescreve o passado e ninguém consegue explicar a fatura.
+
+Também é o que permite oferecer plano com allowance: o tenant compra crédito, não "tokens de um modelo específico". A escolha de modelo fica com o produto, e o custo fica previsível para o cliente.
+
+## Reservar antes, liquidar depois
+
+A resposta errada é debitar no fim. Se o worker morrer no meio da execução, o custo já foi incorrido e não foi registrado. A resposta certa é reservar antes.
+
+O fluxo tem três operações:
+
+- **hold**: reserva uma estimativa antes de chamar o modelo
+- **settle**: liquida o valor real ao final
+- **release**: libera a reserva quando a execução falha ou é abandonada
+
+<Mermaid caption="Ciclo de vida de uma reserva de crédito" chart={`stateDiagram-v2
+    [*] --> HELD: execução iniciada
+    HELD --> SETTLED: execução concluída
+    HELD --> RELEASED: falha ou crash
+    SETTLED --> [*]
+    RELEASED --> [*]
+`} />
+
+A reserva é maior ou igual ao consumo esperado. O `settle` ajusta para o valor real; o `release` devolve integralmente. Em ambos os casos, o ledger registra o evento — não existe ajuste silencioso.
+
+A estimativa da reserva pode ser conservadora; o settle corrige para baixo. O que não pode é reservar zero e descobrir o custo depois.
+
+## Idempotência do ledger
+
+Cada entrada do ledger tem uma chave idempotente única por tenant. Reprocessar a mesma execução encontra a entrada existente e devolve o mesmo resultado, em vez de debitar de novo.
+
+Isso parece detalhe e é o coração do controle. Em um sistema com fila, retry e replay, "cobrar uma vez" só é garantido se a operação de cobrança for idempotente por contrato. Confiar em "não vai acontecer duas vezes" é confiar no ambiente, não no código.
+
+O ledger também separa tipos de entrada. Consumo, reserva, liberação e ajuste são eventos distintos, auditáveis individualmente. Um extrato que só mostra saldo não permite responder "por que o consumo subiu".
+
+## Crash safety
+
+O cenário que mais testa o desenho é o worker morrendo entre o hold e o settle. Sem tratamento, a reserva fica presa e o tenant perde crédito sem ter recebido resposta.
+
+A liberação é acionada no caminho de falha e no processamento de jobs terminais. O teste que importa não é o caminho feliz: é matar o worker no meio e verificar que a reserva volta.
+
+## Métricas que importam
+
+Custo não se controla só com crédito. Precisa de observabilidade por execução. As métricas que uso:
+
+| Métrica | Pergunta que responde |
+| --- | --- |
+| `agent_llm_tokens_total` | Onde o custo está concentrado? |
+| `agent_tool_calls_total` | O agente está usando tools demais? |
+| `agent_handoff_total` | Qual a taxa de escalonamento para humano? |
+| `agent_run_duration_seconds` | A latência está degradando? |
+| `agent_channel_messages_total` | Qual canal está puxando volume? |
+| `agent_channel_delivery_failures_total` | A entrega está falhando? |
+
+Além das métricas de execução, a fila expõe gauges por estado: aguardando, ativo, atrasado, concluído, falho, priorizado e pausado. Fila crescendo com worker saudável é sinal de capacidade; fila crescendo com worker travado é incidente.
+
+<Callout type="warning">
+  Em deploy com múltiplas réplicas, cada réplica expõe o mesmo snapshot global da fila. Agregar somando duplica a contagem. O consumidor precisa usar `max by state` ou um único alvo de scrape.
+</Callout>
+
+Esse detalhe já apareceu em dashboard: o gráfico mostrava o dobro de jobs porque duas réplicas somavam o mesmo estado. Métrica errada é pior que métrica ausente, porque gera decisão errada com confiança.
+
+## Logs sem PII
+
+Custo e observabilidade compartilham uma regra: o que é logado não pode ser sensível.
+
+Log seguro de agente registra tipo de evento, contagem, duração, status, canal, versão do detector e identificadores internos quando necessário para correlação. Não registra conteúdo de mensagem, prompt, argumento de tool, resumo, fato de memória, PII ou token.
+
+Os erros seguem o mesmo princípio: o log carrega o tipo do erro, não o payload que causou o erro. Um `catch` que loga o objeto inteiro é a forma mais comum de vazar dados sem perceber.
+
+Um log de execução seguro carrega: `tenantId`, `conversationId`, `runId`, `agentTemplateKey`, canal, tipo de evento, status, duração, contagem de tokens e tipo de erro. Não carrega: conteúdo de mensagem, prompt, argumento de tool, resultado de tool, resumo, fato de memória, e-mail, telefone, documento ou token.
+
+A lista do que não entra é mais importante que a do que entra. Um campo novo em um log é uma decisão de segurança, não de debugging.
+
+## Alertas que valem a pena
+
+Métrica sem alerta é dashboard que ninguém olha. Quatro alertas cobrem a maior parte do risco:
+
+- **Consumo acima do esperado por tenant** — antes de virar prejuízo, não depois.
+- **Taxa de falha de entrega por canal** — resposta gerada e não entregue é pior que erro visível.
+- **Profundidade da fila com worker ativo** — indica saturação, não pico.
+- **Salto na taxa de handoff** — pode ser mudança de prompt, de modelo ou de tráfego.
+
+O alerta precisa apontar para uma ação. "Consumo alto" sem contexto vira ruído; "tenant X consumiu três vezes a média nas últimas duas horas" vira investigação.
+
+## Como isso vira decisão de produto
+
+Com crédito, métrica e log no lugar, algumas decisões deixam de ser achismo:
+
+- Qual modelo usar por capability, com custo e qualidade medidos
+- Qual limite por plano faz sentido antes de virar prejuízo
+- Quando alertar o tenant sobre consumo anormal
+- Quando desligar uma tool que consome sem entregar resultado
+
+Custo é uma feature de produto. Um agente caro demais é um agente que não escala, por melhor que seja a resposta.
+
+Custo por canal também informa produto. Se o WhatsApp concentra 80% do consumo e 40% do valor, o preço do plano precisa refletir isso — ou o canal vira subsídio.
+
+## Limitações
+
+O modelo de créditos simplifica: um token de entrada e um de saída não custam o mesmo, e modelos diferentes têm preços diferentes. A conversão para crédito precisa refletir isso, ou o controle fica justo na média e errado no caso extremo.
+
+E métrica não mede qualidade. Um agente pode reduzir custo respondendo pior. Por isso o próximo passo é avaliação de comportamento: custo sem qualidade é só uma forma mais rápida de errar.
+
+Há também o custo invisível: retry. Uma execução que falha e repete consome de novo. Reserva e idempotência controlam o financeiro, mas não eliminam o desperdício — por isso a métrica de tokens precisa ser lida junto com a de falha. Retry alto com token alto é sinal de que o problema está antes do modelo.
+
+## Takeaway
+
+Controle de custo de agente é transação: reservar, liquidar, liberar, com idempotência e auditoria. Observabilidade é o que transforma custo em decisão. E log seguro é pré-requisito para as duas coisas — não dá para otimizar o que você não pode registrar sem risco.

@@ -9,12 +9,23 @@ interface SEOProps {
   title: string;
   description: string;
   path?: string;
+  type?: 'website' | 'article';
+  publishedTime?: string;
+  tags?: string[];
 }
 
-export default function SEO({ title, description, path = '/' }: SEOProps) {
+export default function SEO({
+  title,
+  description,
+  path = '/',
+  type = 'website',
+  publishedTime,
+  tags,
+}: SEOProps) {
   const url = `${SITE_URL}${path}`;
+  const isArticle = type === 'article';
 
-  const jsonLd = {
+  const personJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: profile.fullName,
@@ -40,13 +51,35 @@ export default function SEO({ title, description, path = '/' }: SEOProps) {
     },
   };
 
+  const articleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: title,
+    description,
+    url,
+    mainEntityOfPage: url,
+    image: OG_IMAGE,
+    datePublished: publishedTime,
+    author: {
+      '@type': 'Person',
+      name: profile.fullName,
+      url: SITE_URL,
+    },
+    publisher: {
+      '@type': 'Person',
+      name: profile.fullName,
+      url: SITE_URL,
+    },
+    keywords: tags && tags.length > 0 ? tags.join(', ') : undefined,
+  };
+
   return (
     <Head>
       <title>{title}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={url} />
 
-      <meta property="og:type" content="website" />
+      <meta property="og:type" content={isArticle ? 'article' : 'website'} />
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:locale" content="pt_BR" />
       <meta property="og:title" content={title} />
@@ -57,6 +90,12 @@ export default function SEO({ title, description, path = '/' }: SEOProps) {
       <meta property="og:image:height" content="630" />
       <meta property="og:image:alt" content={`Retrato de ${profile.name}`} />
 
+      {isArticle && publishedTime && (
+        <meta property="article:published_time" content={publishedTime} />
+      )}
+      {isArticle &&
+        tags?.map((tag) => <meta key={tag} property="article:tag" content={tag} />)}
+
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
@@ -64,7 +103,9 @@ export default function SEO({ title, description, path = '/' }: SEOProps) {
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(isArticle ? articleJsonLd : personJsonLd),
+        }}
       />
     </Head>
   );

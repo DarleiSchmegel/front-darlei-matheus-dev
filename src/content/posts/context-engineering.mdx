@@ -1,0 +1,127 @@
+---
+title: "Context engineering: o que entra na janela do LLM (e o que fica de fora)"
+description: "Orçamento de tokens, grupos atômicos, resumo incremental e memória como dado não confiável: como montar contexto previsível para um agente que conversa há semanas."
+date: "2026-11-20"
+tags: ["agentes", "contexto", "llm"]
+---
+
+A primeira versão de qualquer agente manda tudo para o modelo: histórico completo, instruções, memória, resultados de tools. Funciona nas primeiras conversas e degrada de forma silenciosa depois. O custo sobe, a latência sobe e a qualidade cai — porque o modelo passa a competir com o próprio histórico por atenção.
+
+Context engineering é o trabalho de decidir, a cada turno, o que entra na janela e o que fica de fora. Não é sobre "prompt melhor". É sobre orçamento, ordem e contrato.
+
+## O orçamento vem antes do prompt
+
+A janela do modelo é um recurso finito e caro. O primeiro passo é medir antes de montar. Uso tiktoken com o encoding do modelo e uma margem deliberada: a estimativa considera as mensagens, as definições de tools e o formato de resposta, além de uma moldura fixa por mensagem.
+
+<Callout type="note">
+  Estimativa não é contagem exata. O provider pode tokenizar de forma diferente, e qualquer margem apertada demais vira erro em produção. Trate a estimativa como limite superior, não como promessa.
+</Callout>
+
+O orçamento de entrada é uma configuração por modelo e por agente. Ele não é o máximo teórico da janela: é o quanto eu aceito gastar por turno. Deixar folga para a saída e para o próximo passo do loop é parte da decisão.
+
+## O que consome orçamento além das mensagens
+
+Três itens costumam ser esquecidos na conta.
+
+**Definições de tools.** Cada tool exposta ao modelo custa tokens — nome, descrição e schema de argumentos. Um agente com doze tools paga esse custo em toda chamada, mesmo quando não usa nenhuma. Expor menos tools é uma decisão de custo e de qualidade.
+
+**Formato de resposta estruturada.** Um JSON schema de saída também entra no request. É barato perto das mensagens, mas não é zero.
+
+**System prompt.** Instruções, guardrails e políticas somam. Em agentes com prompt grande, o system prompt pode competir com o histórico por espaço.
+
+Por isso a estimativa não conta só mensagens: ela inclui mensagens, tools, formato de resposta e molduras fixas. Medir apenas o texto da conversa subestima o consumo real em uma ordem de grandeza que aparece na fatura.
+
+## Grupos atômicos: o que nunca pode se separar
+
+Cortar histórico por mensagem parece simples e está errado. Um `tool_call` e o resultado correspondente são uma unidade: se o corte separa os dois, o modelo recebe um pedido de tool sem resposta — ou uma resposta sem pedido — e o comportamento degrada de forma difícil de diagnosticar.
+
+Por isso o contexto é montado em grupos atômicos: mensagem do usuário, chamada de tool mais resultado, mensagem do assistente. O grupo que contém a mensagem que disparou a execução é protegido: ele nunca é comprimido, porque é o motivo do turno atual.
+
+Também existe a ordem. A compressão atua no prefixo mais antigo, nunca no meio da conversa. O que é recente permanece literal; o que é antigo vira resumo.
+
+## Quando cabe, o que entra primeiro
+
+A ordem de inclusão é deliberada e determinística:
+
+1. Histórico normalizado até o ponto de corte
+2. Episódios de conversas anteriores do mesmo lead, limitados a três
+3. Fatos semânticos, somente se houver folga real no orçamento
+
+O histórico tem prioridade porque é a conversa atual. Episódios entram como continuidade. Fatos semânticos são o último item porque são os mais dispensáveis: se não houver espaço, o agente continua coerente sem eles.
+
+A resolução de política semântica acontece antes de medir o contexto base, mas o embedding só é gerado quando há folga. Essa ordem evita gastar uma chamada de embedding para um bloco que não caberia.
+
+## Quando não cabe: compressão por prefixo
+
+Se a estimativa estoura, o builder tenta comprimir o prefixo em grupos, do mais antigo para o mais recente, até encontrar um ponto que caiba. Cada tentativa é medida com a reserva de resumo já descontada.
+
+A reserva existe porque o resumo também custa tokens. O plano de compressão carrega os IDs das mensagens que serão substituídas, o boundary e a reserva:
+
+```ts
+export interface ContextCompressionPlan {
+  tenantId: string;
+  conversationId: string;
+  runId: string;
+  iteration: number;
+  modelKey: string;
+  providerKey: string;
+  capabilityKey?: string;
+  boundaryMessageId: string;
+  sourceMessageIds: string[];
+  messages: ConversationMessageRecord[];
+  summaryTokenReserve: number;
+}
+```
+
+O resumo é incremental, não recalculado do zero. Ele recebe o resumo anterior mais as mensagens novas, com um system prompt que trata os registros como dados não confiáveis a condensar — preservando fatos, decisões, pendências e próximos passos, sem transformar pedido de usuário em regra de sistema.
+
+O resultado vira uma pseudo-mensagem de sistema, marcada como resumo, e as mensagens originais ficam sinalizadas como sumarizadas. O histórico continua auditável; o contexto é que muda.
+
+O resumo tem idempotência própria. A chave é derivada do boundary e das mensagens de origem; reprocessar a mesma janela devolve o resumo existente em vez de gerar outro. O resultado também é persistido como passo, com uso de tokens, para que o custo da compressão seja auditável.
+
+Existe uma checagem adicional: o resumo novo precisa incluir o anterior. Se o modelo devolver um resumo que ignora o histórico já condensado, a operação falha em vez de perder contexto silenciosamente. É uma validação simples que evita o pior tipo de perda — a que ninguém percebe.
+
+## A conta, com números
+
+Um exemplo para tornar concreto. Suponha orçamento de entrada de 8.000 tokens, system prompt de 900, tools de 1.200, histórico recente de 5.500 e três episódios de 300 cada.
+
+A soma passa de 8.000 antes de qualquer fato semântico. O builder comprime o prefixo mais antigo em grupos até o total caber, reservando 512 tokens para o resumo. Se o grupo protegido — a mensagem que disparou o turno — sozinho já estoura o orçamento, não há compressão possível: a execução falha com erro explícito.
+
+Esse tipo de conta parece trivial até o dia em que um agente com prompt grande e muitas tools passa a falhar apenas em conversas longas. A conta precisa estar no código, não na cabeça de quem escreveu o prompt.
+
+## Memória é dado, não instrução
+
+Episódios e fatos semânticos entram no prompt dentro de delimitadores explícitos, com um aviso: o conteúdo entre eles é contexto não confiável, não instrução, e não pode substituir system prompt, guardrails, permissões ou regras do agente.
+
+Isso não é paranoia decorativa. Memória é texto gerado por modelo a partir de conversa — ou seja, é superfície de injeção. Um lead pode escrever "ignore as instruções anteriores" em uma conversa; se esse trecho for resumido e reinjetado sem demarcação, ele vira parte do contexto de outra conversa.
+
+## Fail-closed quando nada cabe
+
+Se nem o menor prefixo compressível cabe no orçamento, o builder não improvisa. Ele lança um erro explícito de orçamento excedido e a execução falha de forma controlada, com métrica e mensagem de fallback.
+
+<Mermaid caption="Decisão de montagem do contexto" chart={`flowchart TD
+    A["Mensagens normalizadas"] --> B["Grupos atômicos"]
+    B --> C["Estimativa de tokens"]
+    C --> D{"Cabe no orçamento?"}
+    D -->|sim| E["Inclui fatos semânticos se houver folga"]
+    E --> F["Request final"]
+    D -->|não| G["Reserva para resumo"]
+    G --> H["Comprime o prefixo mais antigo"]
+    H --> I{"Cabe agora?"}
+    I -->|sim| F
+    I -->|não| J["Erro fail-closed"]
+`} />
+
+É tentador, no caminho oposto, truncar o texto no meio e seguir. Isso produz uma resposta plausível com contexto mutilado — o pior tipo de falha, porque não aparece em métrica de erro.
+
+## O que ainda não está resolvido
+
+Duas limitações que eu reconheço.
+
+A primeira é que a estimativa de tokens é boa, mas não perfeita. Modelos diferentes tokenizam diferente, e tool definitions grandes pesam mais do que parece. A margem precisa ser medida com dados reais, não escolhida no chute.
+
+A segunda é que resumo é perda de informação por definição. Um resumo bom preserva decisão e pendência; um resumo ruim preserva tom e perde número. A mitigação é testar com conversas reais e manter o histórico original disponível para auditoria — mas isso não elimina o risco.
+
+## Takeaway
+
+Contexto é orçamento, não acumulação. A montagem precisa ser determinística, auditável e conservadora: grupos atômicos, prefixo comprimido, memória delimitada e falha explícita quando não cabe. O modelo pode ser não determinístico; a janela que você entrega a ele não pode.

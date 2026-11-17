@@ -1,0 +1,227 @@
+---
+title: "Agentes de IA em produção: a arquitetura que eu uso"
+description: "Do webhook ao tool calling: as decisões de arquitetura que separam um agente de demonstração de um agente que roda com usuário real, dinheiro e SLA."
+date: "2026-11-18"
+tags: ["agentes", "arquitetura", "nest.js"]
+---
+
+Todo agente começa igual: um prompt, uma chamada de API e uma resposta que parece mágica. A distância entre essa demonstração e um sistema que atende clientes reais é onde vive a maior parte do trabalho — e quase nada dela é sobre prompt.
+
+Este post descreve a arquitetura que uso hoje em uma plataforma multi-tenant de agentes: NestJS, Prisma com PostgreSQL, Redis com BullMQ e um provedor de LLM atrás de uma interface própria. O objetivo não é apresentar a stack, mas as decisões que fazem o sistema sobreviver a mensagens duplicadas, workers que morrem no meio da execução, orçamento de tokens estourado e uma saída de modelo que simplesmente não pode chegar ao cliente.
+
+## O fluxo completo
+
+Antes de defender decisão nenhuma, vale olhar o caminho inteiro. Uma mensagem entra por um canal, é normalizada, vira job, é processada por um worker e só então chega ao modelo.
+
+<Mermaid caption="Fluxo ponta a ponta de uma execução de agente" chart={`sequenceDiagram
+    autonumber
+    participant C as Canal
+    participant I as Ingress
+    participant Q as Fila BullMQ
+    participant W as Worker
+    participant O as Orquestrador
+    participant L as LLM
+    participant T as Tools
+    participant G as Guardrails
+
+    C->>I: mensagem do lead
+    I->>Q: enfileira run da conversa
+    Q->>W: reserva o job
+    W->>O: processa a execução
+    O->>L: contexto + definição das tools
+    L-->>O: resposta ou pedido de tool
+    O->>T: executa tool autorizada
+    T-->>O: resultado estruturado
+    O->>L: continua o loop com o resultado
+    O->>G: valida a saída final
+    G-->>O: ALLOW, REDACT ou BLOCK
+    O->>C: entrega a resposta
+`} />
+
+Cada etapa existe por um motivo específico, e cada uma tem um modo de falha que já vi acontecer. Vou defender as três decisões mais estruturais — fila, separação de canais e contrato de tools — e depois listar o que considero obrigatório para chamar isso de produção.
+
+## O loop por dentro
+
+O diagrama mostra o caminho, mas não mostra o que acontece dentro do orquestrador. Uma execução é um loop com estado, não uma chamada única.
+
+Cada iteração faz quatro coisas: monta o contexto, chama o modelo, executa as tools pedidas e persiste o passo. O loop termina quando o modelo responde sem tool call ou quando um limite de iterações é atingido. O limite não é decoração: sem ele, um modelo que insiste em chamar a mesma tool transforma uma conversa em consumo infinito.
+
+Os passos têm tipos distintos — chamada de modelo, execução de tool, avaliação de guardrail, entrega — e cada um é persistido com status, uso de tokens e resultado. Isso dá três propriedades que eu considero não negociáveis:
+
+- **Retomada**: um worker que morre no passo 3 retoma do passo 3, não do zero.
+- **Auditoria**: dá para reconstruir por que o agente respondeu aquilo, passo a passo.
+- **Idempotência**: replay de um passo já confirmado não reexecuta efeito externo.
+
+O custo dessa decisão é escrever mais no banco por execução. A alternativa — manter o estado só em memória — é mais rápida de implementar e impossível de depurar quando algo dá errado em produção.
+
+## Fila não é otimização, é contrato
+
+A primeira reação de quem vem de CRUD é processar a mensagem dentro do request do webhook. Funciona na demonstração e quebra em produção por três motivos: webhook tem timeout, o provedor de LLM tem latência variável e o mesmo lead manda duas mensagens enquanto a primeira ainda está sendo processada.
+
+Adotei Redis com BullMQ, e a decisão está registrada em um ADR. O ponto central não é "usar fila". É que a fila carrega um contrato de idempotência. O identificador do job é derivado da conversa, não da mensagem:
+
+```ts
+export function buildAgentRunJobId(conversationId: string): string {
+  return `conv:${conversationId}`;
+}
+```
+
+Com isso, duas mensagens simultâneas da mesma conversa não geram dois loops concorrentes: a segunda encontra o job existente e é tratada como continuação. É a diferença entre "o agente respondeu duas vezes" e "o agente respondeu uma vez, na ordem certa".
+
+Além do lock por conversa, a fila entrega retry com backoff, isolamento de falha e visibilidade. Um erro no provedor de LLM não derruba o webhook, não perde a mensagem e aparece como métrica em vez de reclamação de cliente. O worker tem concorrência limitada por configuração — o modelo é caro e instável o suficiente para que paralelismo sem controle seja uma decisão financeira, não técnica.
+
+<Callout type="warning">
+  Idempotência não é só sobre o job. Toda transição relevante — entrega, consumo de crédito, geração de episódio de memória — carrega uma chave idempotente própria. Reprocessar o mesmo evento não pode gerar efeito duplicado nem cobrar duas vezes.
+</Callout>
+
+## Canal é detalhe, core é o produto
+
+O módulo de agentes não conhece WhatsApp. Ele conhece um tipo de canal e um registry de adapters. O núcleo depende de um contrato, não de uma integração.
+
+<Mermaid caption="Camadas: canais na borda, core no centro, infraestrutura atrás de portas" chart={`flowchart LR
+    subgraph Entrada
+        WA["WhatsApp"]
+        AP["API"]
+    end
+
+    subgraph Core
+        ORQ["Orquestrador"]
+        CTX["Contexto"]
+        MEM["Memória"]
+        TLS["Tools"]
+        GRD["Guardrails"]
+    end
+
+    subgraph Infraestrutura
+        PG[("PostgreSQL")]
+        RD[("Redis")]
+        LLM["Provedor de LLM"]
+    end
+
+    WA --> ORQ
+    AP --> ORQ
+    ORQ --> CTX
+    ORQ --> MEM
+    ORQ --> TLS
+    ORQ --> GRD
+    CTX --> PG
+    MEM --> PG
+    TLS --> PG
+    ORQ --> RD
+    ORQ --> LLM
+`} />
+
+O contrato é pequeno de propósito:
+
+```ts
+export interface AgentMessageChannel {
+  readonly channel: AgentChannel;
+  send(input: AgentDeliveryInput): Promise<AgentDeliveryResult>;
+}
+
+export interface AgentChannelAdapter extends AgentMessageChannel {
+  updateContext?(input: AgentChannelContextUpdateInput): Promise<void>;
+}
+```
+
+O canal de WhatsApp implementa esse contrato com listeners de mensagem e status de entrega. A API expõe o mesmo fluxo para testes e integrações. O orquestrador chama `send` e não sabe se a resposta vai para um número de telefone ou para um cliente HTTP.
+
+Essa separação tem um efeito prático pouco óbvio: o núcleo é testável sem canal. A maior parte dos testes de integração roda contra o adapter de API, e o comportamento do agente — contexto, tools, guardrails, créditos — não depende de infraestrutura externa de mensageria. Quando o WhatsApp muda um payload, o blast radius é um adapter, não o produto.
+
+Do lado do WhatsApp, o adapter tem duas responsabilidades que não aparecem no contrato: traduzir o payload do provedor para a mensagem normalizada e acompanhar status de entrega. O listener de mensagem recebida resolve o tenant pelo número, normaliza e enfileira; o listener de status atualiza a mensagem correspondente. Nenhum dos dois contém regra de negócio do agente.
+
+A API usa o mesmo registry, com um adapter de entrega para testes e integrações. É por isso que o fluxo de aceitação consegue validar tool call, guardrail e crédito sem depender de WhatsApp — e por isso um bug de integração não contamina o núcleo.
+
+## Tool calling com contrato
+
+Dar tools ao modelo é fácil. O difícil é dar tools que não podem ser abusadas.
+
+Cada tool declara um schema de argumentos, um escopo de autorização e entra em um registry. A execução passa por três filtros antes de tocar o banco: validação do argumento contra o schema, autorização por escopo do tenant e do agente, e rate limit por execução. Um argumento malformado vira mensagem de erro para o modelo, não exceção que derruba a iteração — o modelo tem a chance de corrigir a chamada.
+
+Também existe um circuit breaker simples: chamadas repetidas da mesma tool com os mesmos argumentos param de ser executadas depois de um limite. Modelos em loop são um problema real de custo, não hipótese de laboratório.
+
+O resultado da tool volta como mensagem estruturada para o modelo, nunca como texto livre interpolado no prompt. Isso reduz a superfície de injeção: o modelo vê dados, não instruções. E toda tool é read-only ou explicitamente autorizada; não existe tool genérica de "executar SQL" ou "chamar URL".
+
+O conjunto de tools não é decidido pelo prompt. Ele vem do blueprint do agente:
+
+```ts
+export interface AgentBlueprint {
+  readonly key: string;
+  readonly name: string;
+  readonly capability: AgentBlueprintCapability;
+  readonly allowedTools: readonly string[];
+  readonly limits: AgentBlueprintLimits;
+  readonly supportedChannels: readonly AgentChannel[];
+}
+```
+
+`allowedTools` é uma allowlist, não uma sugestão. `limits` define o teto de iterações, a duração máxima e o orçamento de contexto. Se o agente tentar uma tool fora da lista, a chamada não existe — e isso vale mesmo que o modelo insista.
+
+## Multi-tenancy na prática
+
+Multi-tenant não é um `tenantId` no header. É um modelo de dados em que o tenant é parte da chave, e um conjunto de decisões sobre o que é compartilhado e o que é isolado.
+
+O que é compartilhado: templates de agente e blueprints, que representam o produto. O que é isolado: configuração do agente por tenant, conversas, memória, créditos e execução. Um tenant pode ajustar prompt, modelo e limites do seu agente — mas não vê nem herda dados de outro.
+
+```ts
+async findActiveByTemplate(tenantId: string, templateId: string) {
+  const agent = await this.prisma.tenantAiAgent.findFirst({
+    where: { tenantId, templateId, isActive: true },
+    include: { template: { include: { capability: true } } },
+  });
+
+  if (!agent) {
+    throw new NotFoundException('No active TenantAiAgent found');
+  }
+
+  return agent;
+}
+```
+
+Repare que a busca não tem caminho alternativo: se não houver agente ativo para aquele tenant e template, a execução não continua com um default global. Falhar é mais seguro que atender com a configuração de outra pessoa.
+
+## O que produção exige além do loop
+
+Quatro coisas que considero obrigatórias e que costumam faltar nas demonstrações.
+
+**Checkpoint e retomada.** Cada iteração do loop persiste um passo da execução. Se o worker morrer no meio, o próximo processamento retoma do último passo confirmado em vez de recomeçar — e não duplica tool calls já executadas. Sem isso, retry é sinônimo de efeito colateral repetido.
+
+**Créditos antes da execução.** A reserva acontece antes de chamar o modelo e é liquidada ou liberada no fim. Um crash libera a reserva; um replay não cobra duas vezes. Sem esse fluxo, um pico de uso vira prejuízo silencioso e um bug de retry vira fatura.
+
+**Métricas por execução.** Tokens consumidos, tool calls, handoffs, duração e estado da fila. Métrica de agente que só conta requisição HTTP não mostra onde o custo está nem por que a latência subiu. O painel precisa responder "qual agente, qual canal, qual modelo, qual etapa".
+
+**Isolamento por tenant em toda query.** Não é filtro opcional em uma camada: é parte da chave de acesso aos dados. Conversa, agente, memória e crédito são sempre escopados por tenant. Um agente que enxerga dados de outro tenant não é um bug de qualidade; é um incidente.
+
+**Handoff como caminho de primeira classe.** Um agente que não sabe responder precisa sair de cena. O handoff não é exceção: é uma transição de estado com motivo, mensagem neutra e resumo para o atendente humano. O resumo é gerado como job separado e idempotente por ciclo, para não atrasar a transferência nem duplicar trabalho.
+
+## Erros comuns que eu já vi
+
+Quatro padrões que parecem razoáveis e cobram caro depois.
+
+**Processar no webhook.** Começa errado por timeout e piora com concorrência. Se a primeira decisão for "chama o modelo aqui", todo o resto vira remendo.
+
+**Confiar no prompt para segurança.** Instrução no system prompt é direção, não controle. Sem validação de saída e autorização de tool, a segurança depende do comportamento do modelo.
+
+**Debitar no fim.** Custo sem reserva é custo sem controle. O caso extremo — worker morrendo no meio — é justamente o que acontece quando o volume cresce.
+
+**Logar payload para depurar.** A forma mais rápida de vazar PII é logar o objeto inteiro "só temporariamente". Log de agente precisa nascer sem conteúdo.
+
+## O que eu faria diferente
+
+Duas coisas.
+
+A primeira é ter começado pelo contrato de tools antes do loop. A ordem natural é fazer o agente conversar e depois endurecer. Endurecer depois custa mais, porque o formato de dados já vazou para várias camadas e cada correção vira migração.
+
+A segunda é ter tratado memória como produto desde o início, não como feature. Memória muda o contexto, o custo e o modelo de dados. Decidir isso tarde força retrofit em tudo que já foi escrito.
+
+A terceira é ter instrumentado custo desde o primeiro dia. Métrica de token e reserva de crédito parecem otimização prematura até a primeira fatura surpresa — e a fatura sempre chega antes da instrumentação.
+
+O que está no roadmap agora é avaliação de comportamento: um conjunto de casos com resultado esperado para medir regressão de qualidade quando prompt, modelo ou tools mudam. Observabilidade mostra que quebrou; avaliação mostra que piorou. São coisas diferentes, e a segunda é a que impede uma melhoria local de virar regressão global.
+
+Hoje a regressão é detectada por teste de comportamento e revisão. O próximo passo é transformar casos reais em suíte de avaliação rodando em CI — a dívida conhecida do desenho atual.
+
+## Takeaway
+
+A arquitetura de um agente em produção é, na maior parte, arquitetura de sistema distribuído: idempotência, isolamento, retry, orçamento e contrato. O modelo é uma dependência externa caríssima e não determinística — e é exatamente por isso que todo o resto precisa ser determinístico.
+
+Nos próximos posts desta série eu abro as partes que aqui ficaram em uma linha: como o contexto é montado, como a memória funciona, como os guardrails decidem o que pode sair e como o custo é controlado.

@@ -1,0 +1,234 @@
+---
+title: "Spec-Driven Development com agentes: o processo por trás do código"
+description: "Gatekeeper read-only, papéis segregados e templates como contrato: como estruturar agentes de código para ganhar velocidade sem perder rastreabilidade."
+date: "2026-12-02"
+tags: ["sdd", "processo", "agentes"]
+---
+
+Agentes de código resolvem o problema de digitar. Não resolvem — e frequentemente agravam — o problema de decidir. Um agente rápido sem processo produz mais código no lugar errado, com menos contexto e mais confiança. O resultado parece produtividade até a primeira regressão difícil de rastrear.
+
+Spec-Driven Development é a resposta que uso: a especificação é o contrato, o agente é o executor, e cada etapa tem um gate que valida contexto, escopo e rastreabilidade antes de avançar.
+
+## O problema que o processo resolve
+
+Três falhas aparecem em qualquer tentativa séria de usar agentes em um código real.
+
+**Contexto insuficiente.** O agente implementa o que entendeu do pedido, não o que o produto decidiu. Sem artefato de origem, não há como distinguir interpretação de requisito.
+
+**Escopo elástico.** "Ajustar o formulário" vira refatoração de três módulos. Sem task delimitada, o diff cresce até ficar irrevisável.
+
+**Rastreabilidade perdida.** Meses depois, ninguém sabe por que aquele código existe. Sem ligação entre requisito, decisão e implementação, a manutenção vira arqueologia.
+
+O processo não existe para burocratizar. Existe para que essas três falhas sejam detectadas antes do merge, não depois do incidente.
+
+## A cadeia completa
+
+O fluxo tem fases com artefatos explícitos e gates entre elas:
+
+<Mermaid caption="Cadeia SDD com gates entre fases" chart={`flowchart LR
+    A["Discovery"] --> G1{"Gate"}
+    G1 --> B["Refinamento"]
+    B --> G2{"Gate"}
+    G2 --> C["PRD"]
+    C --> G3{"Gate"}
+    G3 --> D["Tech Spec"]
+    D --> G4{"Gate"}
+    G4 --> E["Tasks"]
+    E --> G5{"Gate"}
+    G5 --> F["Execução"]
+    F --> G6{"Gate"}
+    G6 --> V["Review"]
+    V --> G7{"Gate"}
+    G7 --> Q["QA"]
+    Q --> X["Bugfix"]
+`} />
+
+Cada fase produz um artefato que a próxima consome. Discovery e refinamento não implementam código. PRD não escolhe tecnologia. Tech Spec não lista tarefas. Tasks não implementam. A separação é o que impede uma decisão de produto de virar detalhe de implementação por acidente.
+
+E a cadeia é viva: bugfix volta para a fase que falhou. Um bug de requisito não se resolve em código.
+
+## Discovery e refinamento não são cerimônia
+
+A cadeia começa antes do PRD, e é onde a maior parte dos problemas é evitada.
+
+**Discovery** investiga o problema e o código existente: o que já existe, quais limites, quais dependências, quais riscos. O artefato é análise, não solução. **Refinamento** transforma isso em decisão de produto: escopo, alternativas descartadas, critérios de sucesso, perguntas abertas.
+
+Só depois vem o PRD, que formaliza o que será construído e por quê. E só depois a Tech Spec, que decide como — incluindo dependências novas, que exigem justificativa e autorização explícita.
+
+Pular etapas parece acelerar. Na prática, empurra a decisão para o código, onde ela fica mais cara e menos visível. Um requisito ambíguo resolvido no PRD custa uma conversa; resolvido no código, custa uma refatoração.
+
+## O gatekeeper
+
+Antes de gravar PRD, Tech Spec, Tasks ou código, um agente dedicado — read-only — valida a fase. Ele não edita arquivos, não responde pergunta e não aprova por suposição.
+
+O contrato de retorno é fixo:
+
+- `STATUS: PASS`, `BLOCKED` ou `FINDINGS`
+- fase, feature, escopo e artefatos inspecionados
+- matriz de artefato obrigatório, status, evidência e rastreabilidade ausente
+- rules aplicáveis, specialist skill e reviewer
+- findings bloqueantes e próximo passo
+
+O gatekeeper verifica se a origem existe, se a task pertence à feature declarada, se dependências estão satisfeitas, se requisitos rastreiam para a task, se ADRs e dependências novas foram autorizadas e se o escopo não excede a especificação.
+
+O gatekeeper também não exige artefatos futuros: para um PRD, a origem e as decisões de produto bastam; para uma Tech Spec, o PRD aprovado; para implementação, a task e seus upstreams. Exigir o que a fase ainda não produz transforma o gate em bloqueio permanente.
+
+<Callout type="note">
+  O gatekeeper não substitui a aprovação de quem decide. Ele impede que a execução comece com contexto incompleto. A decisão final continua no skill principal — e a correção de findings também.
+</Callout>
+
+Um gate que só diz "ok" não serve. O valor está na matriz: qual artefato foi lido, qual evidência foi encontrada, o que está faltando. `BLOCKED` sem evidência é opinião.
+
+## Como o agente recebe contexto
+
+O processo não funciona se o agente precisa adivinhar onde estão as regras. O repositório tem uma estrutura fixa: rules por domínio (NestJS, Prisma, React, testes, logging), skills por procedimento (criar PRD, criar Tech Spec, executar task, revisar), templates por artefato e agentes auxiliares com permissão restrita.
+
+A matriz de roteamento liga contexto a especialista e revisor. Uma mudança de API aciona o skill de backend e o reviewer de backend; uma mudança de schema aciona o skill de banco e o mesmo reviewer; uma mudança de frontend aciona o skill de frontend e o reviewer de frontend. O agente não escolhe o revisor que prefere — a matriz escolhe.
+
+Tudo é versionado junto com o código. Uma regra nova entra por mudança revisada, não por instrução em chat. É a diferença entre processo e folclore.
+
+## Papéis segregados
+
+A execução de uma task passa por quatro papéis, e nenhum deles edita o trabalho do outro:
+
+<Mermaid caption="Papéis e gates durante a execução de uma task" chart={`sequenceDiagram
+    autonumber
+    participant P as Skill principal
+    participant K as Gatekeeper
+    participant S as Specialist
+    participant R as Reviewer
+    participant T as Test validator
+
+    P->>K: valida origem, escopo e rastreabilidade
+    K-->>P: PASS, BLOCKED ou FINDINGS
+    P->>S: plano de implementação
+    S-->>P: contrato aprovado
+    P->>P: implementa e testa
+    P->>R: revisão read-only
+    R-->>P: findings
+    P->>T: valida testes reais
+    T-->>P: baseline e regressão
+    P->>P: corrige e conclui a task
+`} />
+
+O **specialist skill** define como implementar naquele domínio — backend, frontend, banco, testes, observabilidade. O **reviewer** é read-only e aponta problemas; não corrige. O **test-validator** roda os testes reais e diferencia falha preexistente de regressão. O **skill principal** decide, corrige e assume a responsabilidade.
+
+Essa separação resolve um viés específico de agente: o mesmo agente que escreveu o código tende a aprovar o próprio código. Revisão feita por outro agente, com contexto e permissão diferentes, encontra o que o autor não vê.
+
+## O que o agente pode decidir
+
+Uma pergunta prática: se o processo é tão estruturado, o que sobra para o agente?
+
+Sobra execução: ler o contexto, propor plano, implementar dentro do escopo, escrever teste, rodar validação, corrigir findings. Não sobra decisão de produto, escolha de arquitetura sem ADR, mudança de contrato público ou dependência nova sem autorização.
+
+Essa fronteira é o que torna o uso seguro. O agente acelera o trabalho cujo critério já foi decidido; ele não decide o critério.
+
+## Templates como contrato
+
+Cada task segue um template com campos obrigatórios. Não é formulário decorativo: é o que torna a task executável por qualquer agente sem perguntar nada.
+
+```markdown
+## Visão Geral
+- Origem: RF-03 da Tech Spec
+- RF/critério: RF-03, RF-04
+- Specialist skill: /backend-implementation
+- Review agent: backend-reviewer
+- Dependências: 2.0
+- Gatekeeper: PASS (evidência)
+
+## Ambiente de validação
+- Pacote: API
+- Suite: unit + integração
+- Teste: npm run test:integration
+
+<requirements>
+- Lista de requisitos obrigatórios
+</requirements>
+
+## Critérios de Sucesso
+- Critérios verificáveis
+```
+
+Três campos fazem mais trabalho do que parecem.
+
+**Origem e RF** garantem rastreabilidade: a task aponta para o requisito, não para uma conversa. **Ambiente de validação** obriga a declarar como provar que funcionou, incluindo baseline e comandos proibidos. **Critérios de sucesso** precisam ser verificáveis — "funciona bem" não é critério.
+
+O template também tem uma regra explícita: ler os artefatos de origem e as rules aplicáveis antes de implementar; sem esse contexto, a task é inválida. E outra: sempre criar e executar os testes da task antes de considerá-la finalizada.
+
+## Um caso completo: a fila
+
+Vale seguir uma fatia real de ponta a ponta para mostrar como os artefatos se conectam.
+
+**Decisão.** Antes de qualquer código de fila, um ADR registrou a escolha de Redis com BullMQ, as alternativas descartadas e as consequências. Decisão arquitetural vira artefato datado.
+
+**Tech Spec.** Definiu o schema de `AgentRun` e `AgentRunStep`, o contrato do job, o lock por conversa e o comportamento de retry. Cada decisão aponta para o ADR ou para um requisito.
+
+**Tasks.** Foram fatiadas em três: schema e migração, fila e lock, loop com checkpoint e retomada. Cada uma com dependência explícita e critério verificável.
+
+**Execução.** Cada task passou por gatekeeper, specialist, implementação com testes, reviewer e validador. Nenhuma avançou com finding bloqueante.
+
+**Evidência.** O critério de aceite não era "fila funciona". Era: dois webhooks simultâneos da mesma conversa produzem um único loop; retry com backoff verificado; hold de crédito liberado em crash simulado.
+
+Esse último ponto é o que separa processo de documentação. A entrega só é aceita quando a prova existe e pode ser reproduzida.
+
+## Evidência: roadmap fatiado
+
+O processo só convence quando produz evidência. No roadmap deste projeto, cada fatia tem entregável isolado, skill aplicável, critérios de aceitação verificáveis e dependências explícitas.
+
+Um exemplo real de critério:
+
+> Teste de integração: dois webhooks simultâneos da mesma conversa produzem um único loop; retry com backoff verificado; hold de créditos liberado em crash simulado.
+
+Isso não é descrição de feature. É uma prova que pode ser executada. Se o critério não pode virar teste, ele não está pronto.
+
+O roadmap também registra decisões de ordenação e dependências — por exemplo, a escolha de Redis com BullMQ em um ADR, antes de qualquer código de fila. Decisão arquitetural vira artefato datado, não memória de reunião.
+
+E o roadmap tem fatias não concluídas, marcadas como tal. Não fingir que tudo está pronto é parte do contrato: o status documental distingue "aprovado para tech spec" de "implementado".
+
+## O que muda na prática
+
+Três mudanças concretas.
+
+**O diff fica revisável.** Task delimitada produz mudança delimitada. O reviewer consegue avaliar contra um contrato, não contra uma impressão.
+
+**O agente para de adivinhar.** Quando falta contexto, o gatekeeper bloqueia em vez de o agente inventar. O custo de parar é menor que o custo de refazer.
+
+**A discussão sobe de nível.** Em vez de debater detalhe de implementação em comentário de PR, a conversa acontece na Tech Spec, onde a decisão pertence.
+
+Há um efeito colateral positivo: onboarding. Um dev novo — humano ou agente — lê a cadeia e entende por que o sistema é assim. O custo de contexto de entrar no projeto cai, porque a decisão está registrada no lugar onde ela é necessária.
+
+## Erros comuns ao adotar SDD
+
+**Especificação sem critério verificável.** "Melhorar a experiência" não é requisito; é desejo. Se não dá para escrever o teste, não está pronto.
+
+**Gatekeeper de borracha.** Um gate que sempre retorna PASS é pior que nenhum gate, porque cria confiança falsa. O gate precisa ter evidência e precisa bloquear de vez em quando.
+
+**Agente revisando o próprio trabalho.** Sem segregação de papel, a revisão vira confirmação. O autor sempre acha que está certo.
+
+**Processo para tudo.** Cadeia completa em correção de uma linha é teatro. Precisa existir caminho lite, explícito, para baixo risco.
+
+**Documento que ninguém lê.** PRD de 40 páginas que o agente não consome é custo sem retorno. O artefato existe para ser lido pelo próximo passo — humano ou agente.
+
+## Métricas do processo
+
+Processo também se mede. As que eu acompanharia: tempo entre PRD e primeira task, taxa de task bloqueada no gatekeeper, retrabalho por task (quantas voltam do review) e tempo de ciclo por fatia.
+
+Nenhuma delas mede produtividade diretamente. Medem onde o processo trava — e um processo que trava no gatekeeper está fazendo o trabalho dele, não falhando.
+
+Também falta medir custo do processo em tokens. Cada gate e cada revisão consome contexto; um processo que gasta mais contexto do que economiza em retrabalho precisa ser ajustado.
+
+## O que ainda não está resolvido
+
+O processo não mede qualidade de produto. Ele garante que o que foi especificado foi implementado e testado; não garante que a especificação era boa. Um PRD ruim executado com disciplina produz um sistema ruim com ótima documentação.
+
+Também há custo de cerimônia. Para uma correção de uma linha, a cadeia completa é desproporcional — e por isso existe a versão lite de Tech Spec para mudanças de baixo risco. O processo precisa de válvula de escape explícita, ou vira teatro.
+
+E o gatekeeper é um agente. Ele pode errar, aprovar demais ou bloquear por engano. A mitigação é o contrato de retorno exigir evidência — e a decisão final permanecer humana.
+
+## Takeaway
+
+Agentes de código são multiplicadores. Multiplicam a direção que você dá. Spec-Driven Development é a forma de garantir que essa direção exista antes da primeira linha de código: especificação como contrato, gate como controle, evidência como prova.
+
+O ganho não é escrever mais rápido. É escrever a coisa certa, com rastro suficiente para defender a decisão seis meses depois.
+
+O processo também é código: rules, skills e templates vivem no repositório e evoluem por revisão.

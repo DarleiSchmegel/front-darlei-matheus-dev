@@ -240,6 +240,7 @@ export const skillGroups = [
 export const navItems = [
   { href: '/', label: 'Início' },
   { href: '/portfolio', label: 'Projetos' },
+  { href: '/blog', label: 'Blog' },
   { href: '/about', label: 'Sobre' },
   { href: '/contact', label: 'Contato' },
 ];

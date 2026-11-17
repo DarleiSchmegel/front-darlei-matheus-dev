@@ -1,0 +1,160 @@
+---
+title: "Memória de agentes: episódica vs semântica"
+description: "Dois tipos de memória, dois problemas diferentes: continuidade entre conversas e fatos reutilizáveis sobre o lead — com isolamento por tenant e falha fechada."
+date: "2026-11-24"
+tags: ["agentes", "memória", "pgvector"]
+---
+
+Um agente sem memória começa toda conversa do zero. O lead precisa repetir o que já contou, decisões já tomadas são ignoradas e o atendimento perde continuidade. O reflexo é guardar tudo — histórico completo, transcrição, embeddings de tudo — e isso cria um problema pior: memória sem critério vira custo, ruído e risco de privacidade.
+
+Neste projeto eu separei memória em dois tipos com ciclos de vida diferentes: episódica e semântica. Elas resolvem problemas distintos e não devem ser confundidas.
+
+## Dois problemas, dois tipos
+
+**Memória episódica** responde "o que aconteceu nas conversas anteriores com este lead". É narrativa, gerada no encerramento, com resumo, intenção e desfecho.
+
+**Memória semântica** responde "quais fatos estáveis eu sei sobre este lead". É atributo, extraído continuamente, com validade e versão.
+
+A diferença não é acadêmica. Episódio é leitura cronológica; fato é consulta por similaridade. Misturar os dois em uma tabela só força um modelo de dados que não atende bem nenhum dos casos.
+
+Um exemplo ajuda: "o cliente pediu desconto na última conversa e ficou de responder" é episódio. "O cliente prefere contato por WhatsApp à tarde" é fato semântico. A primeira informação perde valor com o tempo; a segunda continua válida até ser corrigida.
+
+## Episódica: nasce no encerramento
+
+Um episódio é criado quando a conversa entra em `RESOLVED` ou `NEEDS_HUMAN`. Ele contém resumo conciso, intenção, desfecho distinguível entre resolução e handoff e, quando necessário à continuidade, entidades relevantes. Nunca o transcript integral.
+
+O limite é três episódios por lead, os mais recentes. Mais do que isso não melhora a continuidade e aumenta o custo de contexto. Menos do que isso perde progressão temporal.
+
+<Callout type="warning">
+  Um encerramento lógico gera no máximo um episódio. Replays, retries e reprocessamentos reutilizam o episódio confirmado. Uma conversa reaberta e encerrada de novo é um novo ciclo e pode gerar um novo episódio.
+</Callout>
+
+O ciclo de vida é explícito, com estados terminais:
+
+<Mermaid caption="Ciclo de vida de um episódio" chart={`stateDiagram-v2
+    [*] --> PENDING: conversa encerrada
+    PENDING --> PROCESSING: job de episódio
+    PROCESSING --> READY: extração válida
+    PROCESSING --> FAILED: falha terminal
+    READY --> [*]
+    FAILED --> [*]
+`} />
+
+Falha na geração não cria episódio parcial nem desfaz a resposta já entregue ou o handoff. A conversa segue; a memória simplesmente não é atualizada.
+
+## Episódica: minimização obrigatória
+
+O episódio passa por minimização antes de ser persistido. Só fica o que serve à continuidade: resumo, intenção, desfecho e entidades relevantes. Prompt, instruções internas, argumentos de tool, IDs individuais, dados pessoais e valores financeiros não entram.
+
+Isso não é só conformidade. Memória é reinjetada em conversas futuras; cada campo desnecessário é uma superfície a mais de vazamento e de injeção.
+
+O atendente autorizado também consulta os episódios no visualizador de conversas, em modo somente leitura. Ele não edita, não regenera e não exclui — memória é derivada, não fonte de verdade. Quem precisa corrigir o histórico corrige a conversa, não o episódio.
+
+## Semântica: catálogo fechado
+
+A memória semântica não extrai "qualquer coisa interessante". Ela extrai um catálogo fechado de atributos, com tipo declarado:
+
+```ts
+export const SEMANTIC_ATTRIBUTE_CATALOG = [
+  { attribute: 'use_case', kind: 'FACT' },
+  { attribute: 'company', kind: 'ENTITY' },
+  { attribute: 'timeline', kind: 'FACT' },
+  { attribute: 'decision', kind: 'FACT' },
+  { attribute: 'next_step', kind: 'FACT' },
+  { attribute: 'preferred_contact_period', kind: 'PREFERENCE' },
+  { attribute: 'preferred_contact_channel', kind: 'PREFERENCE' },
+  { attribute: 'preferred_language', kind: 'PREFERENCE' },
+] as const;
+```
+
+Catálogo fechado resolve três coisas: o modelo não inventa categoria, a consulta é previsível e a evolução do schema é uma decisão versionada — não um efeito colateral de prompt.
+
+## Por que pgvector e não um banco vetorial dedicado
+
+A memória semântica vive no mesmo PostgreSQL do produto, com a extensão pgvector. Não é a escolha mais sofisticada; é a escolha que reduz o número de sistemas que podem falhar.
+
+Três motivos pesaram. O primeiro é isolamento: a busca precisa filtrar por tenant e lead antes de ordenar por similaridade, e isso é uma query SQL com índice e filtro — não um serviço externo que precisa ser mantido em sincronia. O segundo é transação: um fato invalidado e um novo fato inserido podem acontecer na mesma transação; com um banco separado, vira coreografia. O terceiro é operação: backup, restore, migração e observabilidade já existem.
+
+O trade-off é escala. Para milhões de vetores por tenant, um banco dedicado provavelmente ganha. Para o volume atual — dezenas de milhares de fatos por tenant, com recall limitado a 20 candidatos — o PostgreSQL é mais simples e suficientemente rápido.
+
+Escolher a tecnologia chata é uma decisão de arquitetura, não falta de ambição.
+
+A extração usa saída estruturada, com limites duros: no máximo cinco mudanças por execução, fato com até 240 caracteres, entrada de 4.096 tokens e saída de 1.024. Limite não é sugestão: é o que impede uma extração de virar despejo de transcrição.
+
+Mudanças são `add`, `update` ou `invalidate`. Invalidação não deleta: marca `validTo` e preserva histórico. Um fato corrigido continua auditável; um fato apagado não.
+
+Por trás disso existe um pipeline com reconciliação. Uma extração pode propor um fato que já existe com o mesmo valor (repetido), um valor diferente para o mesmo atributo (update), uma correção que invalida o anterior, ou uma evidência ambígua que não permite decidir. Cada caso tem tratamento próprio — e "ambíguo" não vira fato.
+
+Também há concorrência. Duas extrações do mesmo lead podem rodar próximas; o repositório aplica versão e escopo para que uma não sobrescreva a outra sem registro. O fato antigo não desaparece: ele ganha `validTo` e continua consultável no histórico.
+
+Um exemplo de ciclo: o lead diz em janeiro que prefere contato pela manhã. Em março, diz que agora só atende à tarde. A extração de março gera um update: o fato de janeiro recebe `validTo`, o novo fato entra com `validFrom`. O recall passa a devolver o horário novo; o histórico preserva o antigo. Se a conversa de março fosse ambígua — "às vezes de manhã, depende" — nenhum fato seria alterado, porque evidência ambígua não é decisão.
+
+Esse desenho é mais caro que "insert direto". É também o que permite responder, meses depois, por que o agente achava que o cliente preferia contato por e-mail.
+
+## Recall: similaridade com orçamento e prazo
+
+No turno seguinte, a consulta do lead vira embedding e a busca é vetorial, sempre escopada por tenant e lead. Os parâmetros são deliberadamente conservadores:
+- similaridade mínima de 0,75
+- no máximo cinco fatos no bloco
+- bloco limitado a 512 tokens
+- no máximo 20 candidatos avaliados
+- deadline absoluto de 2 segundos
+
+Fatos com similaridade abaixo do limiar são descartados sem penalizar a resposta. O limiar alto é intencional: memória irrelevante é pior que memória ausente, porque desvia o agente com informação que parece relevante.
+
+<Mermaid caption="Extração e recall de memória semântica" chart={`flowchart LR
+    A["Conversa encerrada"] --> B["Job de episódio"]
+    B --> C["Extração estruturada"]
+    C --> D["Minimização de conteúdo"]
+    D --> E[("Episódio persistido")]
+
+    F["Novo turno"] --> G["Query do lead"]
+    G --> H["Embedding"]
+    H --> I["Busca vetorial por tenant e lead"]
+    I --> J["Top 5 acima do limiar"]
+    J --> K["Bloco de contexto delimitado"]
+`} />
+
+O deadline existe porque memória é acessório, não caminho crítico. Se a busca demorar, o agente responde sem ela. Se o embedding falhar, o agente responde sem ela. Memória nunca derruba a resposta principal.
+
+## O que não é memória
+
+Knowledge base não é memória de lead. Memória é sobre uma pessoa ou empresa específica, derivada de conversa. Knowledge base é sobre o produto: políticas, preços, procedimentos, documentação — conteúdo que vale para todos e precisa de RAG com chunking, indexação e citação de fonte.
+
+Misturar os dois produz um agente que "lembra" que o concorrente oferece desconto e trata isso como política interna. A separação de escopo não é organização; é correção semântica.
+
+## Isolamento: escopo é chave, não filtro
+
+Toda operação de memória recebe tenant e lead como parte da chave de escopo. Não existe busca "global" com filtro opcional depois. Se o lead não está identificado, o episódio pode ficar associado apenas à conversa para consulta autorizada — mas não é injetado em outra conversa. O sistema não infere identidade por telefone, nome ou texto.
+
+Essa decisão parece óbvia escrita assim. Na prática, é onde sistemas falham: um `WHERE tenant_id = ?` esquecido em uma query de recall transforma memória em vazamento entre clientes.
+
+## Falha fechada, com motivo classificável
+
+Recall e extração têm um conjunto fechado de motivos de ausência: sem fatos, sem lead, pendente, irrelevante, orçamento, timeout, sem créditos, escopo negado, minimização rejeitada, saída inválida, evidência ambígua, repetido, fonte desatualizada, indisponível.
+
+Motivo fechado não é burocracia. É o que permite métrica por causa e decisão de produto: "quantas respostas ficaram sem memória por timeout?" é uma pergunta respondível. "Deu erro" não é.
+
+## Como eu avaliaria a memória
+
+Métrica de memória não é "quantos fatos existem". É: quantas conversas tiveram recall útil, quantas ficaram sem memória por motivo, e quantas memórias foram invalidadas por correção.
+
+Três sinais que eu acompanharia:
+
+- **Taxa de recall por motivo**: `no_facts`, `irrelevant`, `timeout`, `scope_denied`. Cada um pede ação diferente.
+- **Fatos corrigidos**: se o agente "lembra" errado com frequência, o problema está na extração, não no recall.
+- **Duplicidade**: dois fatos ativos para o mesmo atributo e escopo indicam falha de reconciliação.
+
+Sem isso, memória vira feature que "existe" e ninguém sabe se funciona.
+
+## Limitações
+
+Memória semântica com catálogo fechado não cobre conhecimento aberto. Ela é ótima para preferência e fato de qualificação; é ruim para "o que o cliente achou da última entrega". Esse tipo de pergunta pede knowledge base com RAG, não memória de lead.
+
+E memória episódica depende de encerramento. Conversa que nunca fecha não gera episódio. Em operações com conversas longas e sem desfecho claro, a memória simplesmente não existe — e o sistema precisa funcionar sem ela.
+
+Há também uma dependência de produto: se o encerramento não for confiável, a memória inteira fica. Conversa que fecha por timeout, sem transição explícita, não gera episódio.
+
+## Takeaway
+
+Memória é produto, não cache. Episódica dá continuidade; semântica dá reuso. As duas precisam de escopo por tenant, minimização, limites e falha fechada. O agente pode até responder sem memória; o que ele não pode é responder com memória errada.

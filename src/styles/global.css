@@ -67,6 +67,17 @@ textarea {
   }
 }
 
+@layer components {
+  .post-body :not(pre) > code {
+    @apply border border-edge-light bg-surface-light px-1 py-0.5 font-mono text-[0.85em] font-normal dark:border-edge-dark dark:bg-surface-dark;
+  }
+
+  .post-body :not(pre) > code::before,
+  .post-body :not(pre) > code::after {
+    content: none;
+  }
+}
+
 .lightbox-overlay {
   height: 100vh;
   height: 100dvh;
